@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `export DATABASE_URL=sqlite:////private/tmp/insightflow-playwright.db CELERY_TASK_ALWAYS_EAGER=true UPLOAD_DIR=/private/tmp/insightflow-playwright-uploads PYTHONPATH=../backend; ${python} -m alembic -c ../backend/alembic.ini upgrade head && ${python} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
+      command: `export DATABASE_URL=sqlite:////tmp/insightflow-playwright.db CELERY_TASK_ALWAYS_EAGER=true UPLOAD_DIR=/tmp/insightflow-playwright-uploads PYTHONPATH=../backend; ${python} -m alembic -c ../backend/alembic.ini upgrade head && ${python} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
       url: 'http://127.0.0.1:8000/api/health',
       timeout: 120_000,
       reuseExistingServer: false,

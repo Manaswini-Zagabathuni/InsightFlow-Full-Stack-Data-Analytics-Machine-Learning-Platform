@@ -1,0 +1,17 @@
+customer_id,age,segment,churn
+1,31,SMB,no
+2,36,Enterprise,yes
+3,42,Mid-market,no
+4,29,Enterprise,yes
+5,55,SMB,no
+6,45,Mid-market,no
+7,26,SMB,yes
+8,49,Enterprise,no
+9,33,Mid-market,no
+10,41,SMB,yes
+11,38,Enterprise,no
+12,52,Mid-market,no
+13,24,SMB,yes
+14,47,Enterprise,no
+15,35,Mid-market,no
+16,44,SMB,yes

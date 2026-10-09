@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { api, TOKEN_KEY } from './api/client'
+import { api } from './api/client'
 import { AuthProvider } from './context/AuthContext'
 
 function renderAt(path: string) {
@@ -11,8 +11,8 @@ function renderAt(path: string) {
 
 describe('authentication routes', () => {
   beforeEach(() => {
-    localStorage.clear()
     vi.restoreAllMocks()
+    vi.spyOn(api, 'get').mockImplementation(() => new Promise(() => {}))
   })
 
   it('renders the login screen', () => {
@@ -26,12 +26,12 @@ describe('authentication routes', () => {
   })
 
   it('redirects unauthenticated users away from protected routes', async () => {
+    vi.mocked(api.get).mockRejectedValue(new Error('No active session'))
     renderAt('/dashboard')
     expect(await screen.findByRole('heading', { name: 'Sign in to continue' })).toBeTruthy()
   })
 
   it('restores a persisted session through the current-user endpoint', async () => {
-    localStorage.setItem(TOKEN_KEY, 'persisted-token')
     vi.spyOn(api, 'get').mockImplementation(async (url) => {
       if (url === '/users/me') return { data: { id: 'user-1', email: 'ada@example.com', full_name: 'Ada Lovelace', created_at: new Date().toISOString() } } as never
       return { data: { status: 'healthy', service: 'insightflow-api', version: '0.1.0', database: 'connected' } } as never

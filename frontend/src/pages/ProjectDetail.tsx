@@ -35,8 +35,9 @@ export function ProjectDetail() {
 
   const upload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError('')
-    const form = new FormData(event.currentTarget)
-    try { await api.post(`/projects/${id}/datasets`, form); event.currentTarget.reset(); await load() }
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    try { await api.post(`/projects/${id}/datasets`, form); formElement.reset(); await load() }
     catch (requestError) { setError(apiErrorMessage(requestError)) }
   }
   const rename = async (event: FormEvent<HTMLFormElement>) => {

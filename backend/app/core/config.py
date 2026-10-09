@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEVELOPMENT_JWT_SECRETS = {
     "development-only-change-before-deployment",
+    "generate-a-long-random-secret-for-shared-environments",
     "local-development-secret-change-before-deployment",
 }
 
@@ -22,9 +23,16 @@ class Settings(BaseSettings):
     jwt_secret: str = "development-only-change-before-deployment"
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_minutes: int = 60
+    auth_cookie_name: str = "insightflow_session"
+    csrf_cookie_name: str = "insightflow_csrf"
     upload_dir: Path = Path("uploads")
     max_upload_bytes: int = 25 * 1024 * 1024
     max_csv_columns: int = 500
+    max_csv_rows: int = 250_000
+    max_active_profiles_per_user: int = 3
+    max_active_experiments_per_user: int = 2
+    profile_job_time_limit_seconds: int = 300
+    training_job_time_limit_seconds: int = 1_800
     celery_task_always_eager: bool = False
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:e2b"
@@ -36,8 +44,12 @@ class Settings(BaseSettings):
     def validate_runtime_configuration(self):
         if self.access_token_minutes <= 0:
             raise ValueError("ACCESS_TOKEN_MINUTES must be positive")
-        if self.max_upload_bytes <= 0 or self.max_csv_columns <= 0:
+        if self.max_upload_bytes <= 0 or self.max_csv_columns <= 0 or self.max_csv_rows <= 0:
             raise ValueError("Upload limits must be positive")
+        if self.max_active_profiles_per_user <= 0 or self.max_active_experiments_per_user <= 0:
+            raise ValueError("Active job limits must be positive")
+        if self.profile_job_time_limit_seconds <= 0 or self.training_job_time_limit_seconds <= 0:
+            raise ValueError("Background job time limits must be positive")
         if self.ollama_timeout_seconds <= 0:
             raise ValueError("OLLAMA_TIMEOUT_SECONDS must be positive")
         if self.environment.lower() in {"production", "staging"} and self.jwt_secret in DEVELOPMENT_JWT_SECRETS:
@@ -49,6 +61,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.environment.lower() in {"production", "staging"}
 
 
 @lru_cache

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import delete
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Dataset, DatasetColumn, Experiment, ExperimentMetric
 from app.services.machine_learning import train_models
@@ -12,7 +13,13 @@ from app.workers.celery_app import celery_app
 logger = logging.getLogger("insightflow.worker")
 
 
-@celery_app.task(name="insightflow.profile_dataset")
+@celery_app.task(
+    name="insightflow.profile_dataset",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    soft_time_limit=settings.profile_job_time_limit_seconds - 5,
+    time_limit=settings.profile_job_time_limit_seconds,
+)
 def profile_dataset(dataset_id: str) -> None:
     db = SessionLocal()
     dataset = db.get(Dataset, dataset_id)
@@ -41,7 +48,13 @@ def profile_dataset(dataset_id: str) -> None:
         db.close()
 
 
-@celery_app.task(name="insightflow.train_experiment")
+@celery_app.task(
+    name="insightflow.train_experiment",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    soft_time_limit=settings.training_job_time_limit_seconds - 10,
+    time_limit=settings.training_job_time_limit_seconds,
+)
 def train_experiment(experiment_id: str) -> None:
     db = SessionLocal()
     experiment = db.get(Experiment, experiment_id)

@@ -1,22 +1,28 @@
 import axios from 'axios'
 
-export const TOKEN_KEY = 'insightflow_access_token'
-
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
+  withCredentials: true,
 })
 
+function cookieValue(name: string) {
+  const prefix = `${encodeURIComponent(name)}=`
+  return document.cookie.split('; ').find((cookie) => cookie.startsWith(prefix))?.slice(prefix.length)
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const method = config.method?.toUpperCase() || 'GET'
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = cookieValue('insightflow_csrf')
+    if (csrfToken) config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken)
+  }
   return config
 })
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401 && localStorage.getItem(TOKEN_KEY)) {
-      localStorage.removeItem(TOKEN_KEY)
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
       window.dispatchEvent(new Event('insightflow:unauthorized'))
     }
     return Promise.reject(error)

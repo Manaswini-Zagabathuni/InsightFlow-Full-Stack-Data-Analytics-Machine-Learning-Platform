@@ -2,6 +2,7 @@ import io
 
 import pytest
 
+from app.core.config import settings
 from app.services import machine_learning
 
 
@@ -122,6 +123,20 @@ def test_training_is_dispatched_and_http_request_remains_queued(client, monkeypa
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
     assert dispatched == [response.json()["id"]]
+
+
+def test_active_experiment_limit_is_enforced_per_user(client, monkeypatch):
+    headers, project, dataset = setup_ml_dataset(client)
+    monkeypatch.setattr(settings, "max_active_experiments_per_user", 1)
+    monkeypatch.setattr("app.api.routes.experiments.train_experiment.delay", lambda _experiment_id: None)
+    request = payload(project, dataset, "classification", ["logistic_regression"], "churn")
+
+    first = client.post("/api/experiments", json=request, headers=headers)
+    second = client.post("/api/experiments", json=request, headers=headers)
+
+    assert first.status_code == 202
+    assert first.json()["status"] == "queued"
+    assert second.status_code == 429
 
 
 def test_experiment_catalog_and_owner_authorization(client):

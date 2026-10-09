@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import get_current_user
 from app.api.ownership import require_owned_dataset, require_owned_project
+from app.core.config import settings
 from app.db.session import get_db
-from app.models import Experiment, ExperimentMetric, User
+from app.models import Experiment, ExperimentMetric, Project, User
 from app.schemas import (
     ExperimentCreate,
     ExperimentMetricResponse,
@@ -39,6 +40,13 @@ def get_model_catalog(_: User = Depends(get_current_user)) -> dict:
 @router.post("", response_model=ExperimentResponse, status_code=status.HTTP_202_ACCEPTED)
 def create_experiment(payload: ExperimentCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Experiment:
     require_owned_project(payload.project_id, user, db)
+    active_experiments = db.scalar(
+        select(func.count(Experiment.id))
+        .join(Project, Project.id == Experiment.project_id)
+        .where(Project.owner_id == user.id, Experiment.status.in_(("queued", "training")))
+    ) or 0
+    if active_experiments >= settings.max_active_experiments_per_user:
+        raise HTTPException(status_code=429, detail="Too many experiments are already active")
     dataset = require_owned_dataset(payload.dataset_id, user, db)
     if dataset.project_id != payload.project_id:
         raise HTTPException(status_code=422, detail="Dataset does not belong to the selected project")

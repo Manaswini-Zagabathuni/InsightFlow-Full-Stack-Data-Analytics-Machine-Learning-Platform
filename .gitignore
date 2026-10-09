@@ -12,6 +12,7 @@ dist/
 output/
 playwright-report/
 test-results/
+.playwright-browsers/
 .DS_Store
 work/
 tmp/

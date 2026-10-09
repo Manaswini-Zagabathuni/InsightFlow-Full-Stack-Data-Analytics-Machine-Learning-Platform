@@ -40,3 +40,6 @@ def test_production_rejects_development_jwt_secret():
 
     with pytest.raises(ValidationError, match="at least 32 characters"):
         Settings(environment="production", jwt_secret="too-short")
+
+    with pytest.raises(ValidationError, match="JWT_SECRET must be replaced"):
+        Settings(environment="production", jwt_secret="generate-a-long-random-secret-for-shared-environments")

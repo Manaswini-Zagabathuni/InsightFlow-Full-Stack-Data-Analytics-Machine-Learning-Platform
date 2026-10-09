@@ -14,9 +14,11 @@ This repository contains the InsightFlow platform foundation, authentication, pr
 - Typed environment configuration via `pydantic-settings`
 - Backend health endpoint that executes a real database query
 - Registration, login, logout, bcrypt password hashing, JWT access tokens, and current-user authorization
+- HttpOnly browser session cookies with SameSite and double-submit CSRF protection; bearer tokens remain supported for API clients
 - Persistent protected frontend routing with responsive login and registration screens
 - User-owned project creation, listing, opening, renaming, and deletion
 - Secure CSV upload with generated storage paths and strict validation
+- Bounded upload rows/columns and per-user profiling/training concurrency limits
 - Redis/Celery background profiling with persisted column statistics and transparent data-quality scores
 - Server-side dataset exploration with pagination, search, sorting, column metadata, and missing-value indicators
 - Interactive bar, line, scatter, histogram, box, donut, and correlation-heatmap charts generated from uploaded CSV data
@@ -59,6 +61,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
+For a detached, health-gated launch followed by the live core-flow verification:
+
+```bash
+docker compose up --build --detach --wait
+docker compose exec -T backend python scripts/compose_smoke.py
+```
+
 Services:
 
 - Frontend: <http://localhost:5173>
@@ -99,6 +108,11 @@ Use `docker compose down -v` only when you intentionally want to delete local Po
 | `UPLOAD_DIR` | Private dataset and report storage root | `uploads` |
 | `MAX_UPLOAD_BYTES` | Maximum CSV upload size | `26214400` |
 | `MAX_CSV_COLUMNS` | Maximum accepted CSV columns | `500` |
+| `MAX_CSV_ROWS` | Maximum accepted nonblank CSV rows | `250000` |
+| `MAX_ACTIVE_PROFILES_PER_USER` | Concurrent queued/profiling datasets per user | `3` |
+| `MAX_ACTIVE_EXPERIMENTS_PER_USER` | Concurrent queued/training experiments per user | `2` |
+| `PROFILE_JOB_TIME_LIMIT_SECONDS` | Hard profiling job limit | `300` |
+| `TRAINING_JOB_TIME_LIMIT_SECONDS` | Hard training job limit | `1800` |
 | `OLLAMA_BASE_URL` | Local Ollama server; Compose uses the host gateway | `http://localhost:11434` outside Docker |
 | `OLLAMA_MODEL` | Locally installed open model | `gemma4:e2b` |
 | `OLLAMA_TIMEOUT_SECONDS` | Local generation timeout | `60` |
@@ -190,7 +204,7 @@ Ollama responses are instructed to distinguish correlation, model importance, an
 
 ```bash
 cd backend
-ruff check app tests
+ruff check app tests alembic scripts
 pytest --cov=app
 pip-audit -r requirements.txt
 
@@ -199,9 +213,19 @@ pnpm lint
 pnpm test
 pnpm build
 pnpm audit --prod
+pnpm exec playwright install chromium
+INSIGHTFLOW_PYTHON=../backend/.venv/bin/python pnpm e2e
 ```
 
-Backend tests cover registration, credentials, authorization, project and dataset ownership, upload/profiling/exploration, visualization validation, asynchronous ML dispatch, all built-in learning algorithms, preprocessing, leakage boundaries, metrics persistence, explainability, report generation/download authorization, assistant guardrails, the health response, and the database check. GitHub Actions run backend lint/tests/source compilation, frontend lint/tests/production compilation, and Docker Compose builds for pushes and pull requests.
+Backend tests cover registration, cookie and bearer authentication, CSRF enforcement, credentials, authorization, project and dataset ownership, resource limits, upload/profiling/exploration, visualization validation, asynchronous ML dispatch, all built-in learning algorithms, preprocessing, leakage boundaries, metrics persistence, explainability, report generation/download authorization, assistant guardrails, the health response, and the database check. The Playwright test covers the browser workflow from registration through report generation.
+
+GitHub Actions run backend lint/tests/source compilation/dependency auditing, frontend lint/unit tests/type checking/production compilation/Playwright, and a Docker Compose startup plus live API workflow on pushes and pull requests. Workflow configuration is not evidence of a passing remote run until GitHub Actions has executed it.
+
+## Verification status
+
+As of 2026-10-09, backend tests, frontend unit tests, linting, type checking, the Vite build, dependency audits, Alembic migrations, and the Playwright critical-flow test have run successfully on the review host. The Playwright flow used SQLite and eager Celery execution.
+
+Docker commands could not run on the review host because Docker and compatible runtimes are not installed. The Compose workflow is configured to build images, wait for all service health checks, run migrations through the backend startup command, and execute `backend/scripts/compose_smoke.py` against PostgreSQL, Redis, FastAPI, Celery, and nginx. Treat Compose as unverified until that workflow or the commands below complete successfully on a Docker-capable machine.
 
 ## Repository structure
 
@@ -215,7 +239,9 @@ backend/
   app/services/        profiling, visualization, ML, explainability, assistant, and PDF reporting
   app/main.py          FastAPI application and health endpoint
   tests/               backend tests
+  scripts/             live Compose verification
 frontend/
+  e2e/                 Playwright critical workflow
   src/App.tsx          public and protected routes
   src/context/         persistent authentication state
   src/pages/           authentication and protected analytics workspaces

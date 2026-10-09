@@ -77,6 +77,18 @@ def test_protected_endpoint_with_valid_token(client):
     assert response.json()["email"] == REGISTER_PAYLOAD["email"]
 
 
+def test_cookie_session_requires_csrf_for_mutations(client):
+    assert register(client).status_code == 201
+    assert client.get("/api/users/me").status_code == 200
+    assert client.post("/api/auth/logout").status_code == 403
+
+    csrf_token = client.cookies.get("insightflow_csrf")
+    response = client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf_token})
+
+    assert response.status_code == 204
+    assert "insightflow_session" not in client.cookies
+
+
 def test_logout_requires_authentication_and_accepts_valid_token(client):
     assert client.post("/api/auth/logout").status_code == 401
     token = register(client).json()["access_token"]

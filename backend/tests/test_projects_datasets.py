@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Dataset
 
@@ -108,6 +109,23 @@ def test_invalid_files_are_rejected(client):
     assert malformed_later_row.status_code == 422
     assert "row 3" in malformed_later_row.json()["detail"]
     assert blank_document.status_code == 422
+
+
+def test_csv_row_and_active_profile_limits(client, monkeypatch):
+    headers = auth_headers(client)
+    project = create_project(client, headers)
+    monkeypatch.setattr(settings, "max_csv_rows", 1)
+    too_many_rows = upload_csv(client, project["id"], headers, b"value\n1\n2\n")
+    assert too_many_rows.status_code == 413
+
+    monkeypatch.setattr(settings, "max_csv_rows", 250_000)
+    monkeypatch.setattr(settings, "max_active_profiles_per_user", 1)
+    monkeypatch.setattr("app.api.routes.datasets.profile_dataset.delay", lambda _dataset_id: None)
+    first = upload_csv(client, project["id"], headers, b"value\n1\n")
+    second = upload_csv(client, project["id"], headers, b"value\n2\n")
+    assert first.status_code == 202
+    assert first.json()["dataset"]["status"] == "queued"
+    assert second.status_code == 429
 
 
 def test_explorer_paginates_searches_sorts_and_marks_missing_values(client):

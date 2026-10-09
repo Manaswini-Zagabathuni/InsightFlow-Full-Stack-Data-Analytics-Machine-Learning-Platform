@@ -1,8 +1,10 @@
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import (
     assistant,
@@ -43,6 +45,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def protect_cookie_sessions_from_csrf(request: Request, call_next):
+    unsafe_method = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+    public_auth_path = request.url.path in {"/api/auth/login", "/api/auth/register"}
+    uses_bearer = request.headers.get("authorization", "").lower().startswith("bearer ")
+    session_cookie = request.cookies.get(settings.auth_cookie_name)
+    if unsafe_method and not public_auth_path and session_cookie and not uses_bearer:
+        csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
+        csrf_header = request.headers.get("x-csrf-token")
+        if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    return await call_next(request)
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")

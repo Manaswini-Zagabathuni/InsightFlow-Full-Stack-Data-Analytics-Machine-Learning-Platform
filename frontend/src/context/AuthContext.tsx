@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
-import { api, TOKEN_KEY } from '../api/client'
+import { api } from '../api/client'
 
 export type User = { id: string; email: string; full_name: string; created_at: string }
 type Credentials = { email: string; password: string }
@@ -19,14 +19,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) {
-      setLoading(false)
-      return
-    }
     api.get<User>('/users/me')
       .then(({ data }) => setUser(data))
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      .catch(() => setUser(null))
       .finally(() => setLoading(false))
   }, [])
 
@@ -36,26 +31,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('insightflow:unauthorized', clearExpiredSession)
   }, [])
 
-  const acceptSession = (accessToken: string, sessionUser: User) => {
-    localStorage.setItem(TOKEN_KEY, accessToken)
-    setUser(sessionUser)
-  }
-
   const login = async (credentials: Credentials) => {
     const { data } = await api.post('/auth/login', credentials)
-    acceptSession(data.access_token, data.user)
+    setUser(data.user)
   }
 
   const register = async (registration: Registration) => {
     const { data } = await api.post('/auth/register', registration)
-    acceptSession(data.access_token, data.user)
+    setUser(data.user)
   }
 
   const logout = async () => {
     try {
       await api.post('/auth/logout')
     } finally {
-      localStorage.removeItem(TOKEN_KEY)
       setUser(null)
     }
   }

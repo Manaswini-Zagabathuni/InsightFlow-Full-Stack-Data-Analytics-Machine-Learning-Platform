@@ -7,14 +7,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.api.ownership import require_owned_dataset, require_owned_project
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Dataset, User
+from app.models import Dataset, Project, User
 from app.schemas import ColumnResponse, DatasetResponse, DatasetRowsResponse
 from app.workers.tasks import profile_dataset
 
@@ -56,6 +56,8 @@ def validate_csv(filename: str, content_type: str | None, data: bytes) -> list[s
             if not any(cell.strip() for cell in row):
                 continue
             data_rows += 1
+            if data_rows > settings.max_csv_rows:
+                raise HTTPException(status_code=413, detail=f"CSV exceeds the {settings.max_csv_rows}-row limit")
             if len(row) != len(header):
                 raise HTTPException(status_code=422, detail=f"CSV row {row_number} does not match the header column count")
     except csv.Error as exc:
@@ -68,6 +70,13 @@ def validate_csv(filename: str, content_type: str | None, data: bytes) -> list[s
 @router.post("/projects/{project_id}/datasets", status_code=status.HTTP_202_ACCEPTED)
 async def upload_dataset(project_id: str, file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     project = require_owned_project(project_id, user, db)
+    active_profiles = db.scalar(
+        select(func.count(Dataset.id))
+        .join(Project, Project.id == Dataset.project_id)
+        .where(Project.owner_id == user.id, Dataset.status.in_(("queued", "profiling")))
+    ) or 0
+    if active_profiles >= settings.max_active_profiles_per_user:
+        raise HTTPException(status_code=429, detail="Too many dataset profiles are already active")
     original_filename = Path((file.filename or "dataset.csv").replace("\\", "/")).name[:255]
     content = await file.read(settings.max_upload_bytes + 1)
     validate_csv(original_filename, file.content_type, content)

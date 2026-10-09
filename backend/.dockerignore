@@ -1,0 +1,10 @@
+.venv
+__pycache__
+.pytest_cache
+.coverage*
+*.db
+test_uploads
+uploads
+work
+.env
+.git

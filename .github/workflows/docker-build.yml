@@ -20,9 +20,11 @@ jobs:
             docker compose ps --all
             echo "=== Frontend health details ==="
             FRONTEND_ID="$(docker compose ps --all -q frontend)"
-            if [ -n "$FRONTEND_ID" ]; then
-              docker inspect --format '{{json .State.Health}}' "$FRONTEND_ID"
+             if [ -n "$FRONTEND_ID" ]; then
+              docker inspect --format '{{json .State}}' "$FRONTEND_ID"
             fi
+            echo "=== Frontend logs ==="
+            docker compose logs --no-color frontend
             echo "=== All container logs ==="
             docker compose logs --no-color
             exit 1

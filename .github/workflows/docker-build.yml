@@ -6,34 +6,48 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - run: docker compose config
+      - name: Validate Docker Compose configuration
+        run: docker compose config
 
-      - run: docker compose build
+      - name: Build Docker images
+        run: docker compose build
 
       - name: Start containers and diagnose health failures
         run: |
           docker compose up --detach --wait || {
             echo "=== Container status ==="
             docker compose ps --all
+
             echo "=== Frontend health details ==="
             FRONTEND_ID="$(docker compose ps --all -q frontend)"
-             if [ -n "$FRONTEND_ID" ]; then
+
+            if [ -n "$FRONTEND_ID" ]; then
               docker inspect --format '{{json .State}}' "$FRONTEND_ID"
+              docker inspect --format '{{json .Config.Healthcheck}}' "$FRONTEND_ID"
+            else
+              echo "Frontend container was not found."
             fi
+
             echo "=== Frontend logs ==="
             docker compose logs --no-color frontend
+
             echo "=== All container logs ==="
             docker compose logs --no-color
+
             exit 1
           }
 
-      - run: docker compose exec -T backend python scripts/compose_smoke.py
+      - name: Run application smoke tests
+        run: docker compose exec -T backend python scripts/compose_smoke.py
 
-      - if: always()
+      - name: Print container logs
+        if: always()
         run: docker compose logs --no-color
 
-      - if: always()
+      - name: Stop containers
+        if: always()
         run: docker compose down --volumes

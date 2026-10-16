@@ -50,6 +50,7 @@ FastAPI backend :8000
   └── profiling/training jobs ── Redis :6379 ── Celery worker
 ```
 
+
 Redis brokers real background dataset-profiling jobs to the Celery worker. Tests use Celery eager mode so the same task is deterministic without a broker.
 
 ## Start with Docker

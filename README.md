@@ -2,6 +2,7 @@
 
 This repository contains the InsightFlow platform foundation, authentication, project/dataset management, interactive visualization, asynchronous machine-learning experimentation, explainability, downloadable PDF reporting, and an optional local dataset assistant.
 
+
 ## Included
 
 - React 18, TypeScript, Vite, and Tailwind CSS frontend

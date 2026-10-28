@@ -280,3 +280,5 @@ Each explanation stores original-column global importance, one representative he
 The interface labels feature importance as model-derived. It separately explains that correlation measures statistical association and that neither model importance nor correlation establishes causation. InsightFlow does not present these explanations as causal effects.
 
 Saved explanations are included with experiment metrics and available from `GET /api/experiments/{id}/explainability`. Migration `0006_explainability` adds persisted explanation payloads; experiments created before that migration display an explicit rerun message.
+
+
